@@ -34,20 +34,20 @@ std::shared_ptr<FakeJni::JByteArray> Ecdsa::sign(std::shared_ptr<FakeJni::JByteA
     if (!sig) {
         throw std::runtime_error("OpenSSL failed to sign bytearray");
     }
-    auto n = (EC_GROUP_order_bits(ecgroup) + 7) / 8;
-    const BIGNUM* r = ECDSA_SIG_get0_r(sig);
+    auto n = (EC_GROUP_get_degree(ecgroup) + 7) / 8;
+    const BIGNUM *r, *s;
+    ECDSA_SIG_get0(sig, &r, &s);
     if (!r) {
         throw std::runtime_error("OpenSSL failed to get r");
     }
-    const BIGNUM* s = ECDSA_SIG_get0_s(sig);
     if (!s) {
         throw std::runtime_error("OpenSSL failed to get s");
     }
     auto buf = std::make_shared<FakeJni::JByteArray>(2 * n);
-    if (BN_bn2binpad(r, (unsigned char*)buf->getArray(), n) != n) {
+    if (!BN_bn2bin(r, (unsigned char*)buf->getArray())) {
         throw std::runtime_error("OpenSSL failed to export bignum");
     }
-    if (BN_bn2binpad(s, (unsigned char*)buf->getArray() + n, n) != n) {
+    if (!BN_bn2bin(s, (unsigned char*)buf->getArray() + n)) {
         throw std::runtime_error("OpenSSL failed to export bignum");
     }
     ECDSA_SIG_free(sig);
@@ -78,7 +78,7 @@ EcdsaPublicKey::EcdsaPublicKey(EC_KEY *eckey, EC_GROUP *ecgroup) {
     if (!x || !y) {
         throw std::runtime_error("OpenSSL failed to allocate bignum");
     }
-    if (EC_POINT_get_affine_coordinates(ecgroup, point, x, y, NULL) != 1) {
+    if (EC_POINT_get_affine_coordinates_GFp(ecgroup, point, x, y, NULL) != 1) {
         throw std::runtime_error("OpenSSL failed to get affine coordinates");
     }
     auto len = BN_num_bytes(x);
